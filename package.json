@@ -1,5 +1,6 @@
 {
 	"name": "source-han-sans-ttf",
+	"version": "2.001.0",
 	"private": true,
 	"dependencies": {
 		"@chlorophytum/cli": "^0.2.0",
