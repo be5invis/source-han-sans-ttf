@@ -1,0 +1,25 @@
+{
+	"prefix": "SourceHanSans",
+	"regions": ["", "K", "SC", "TC", "HC"],
+	"allRegions": [
+		"",
+		"K",
+		"SC",
+		"TC",
+		"HC",
+		"HW",
+		"HWK",
+		"HWSC",
+		"HWTC",
+		"HWHC"
+	],
+	"weights": [
+		"ExtraLight",
+		"Light",
+		"Normal",
+		"Regular",
+		"Medium",
+		"Bold",
+		"Heavy"
+	]
+}
