@@ -5,6 +5,7 @@
 		"otds",
 		"otfccbuild",
 		"otfccdump",
+		"ttcize",
 		"ttfautohint",
 		"verda"
 	],

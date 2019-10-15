@@ -201,16 +201,23 @@ const Pass5Ttf = file.make(
 		await OtfccBuildAsIs(input.full, output.full);
 	}
 );
-const Pass5Group = task.make(
-	weight => `pass5-group::${weight}`,
-	async ($, weight) => {
+const Pass5Group = file.make(
+	(init, weight) => `${PASS5}/${init}-${weight}.ttc`,
+	async ($, output, init, weight) => {
 		const [config] = await $.need(Config);
-		await $.need(GroupFileNamesT(config, weight, Pass5Ttf));
+		const [ttfs] = await $.need(GroupFileNamesT(config, weight, Pass5Ttf));
+		const ttcize = "node_modules/.bin/otfcc-ttcize" + (os.platform() === "win32" ? ".cmd" : "");
+		await run(
+			ttcize,
+			["-x", "--common-width", 1000, "--common-height", 1000],
+			["-o", output.full],
+			[...ttfs.map(t => t.full)]
+		);
 	}
 );
-const Ttf = task(`ttf`, async $ => {
+const All = task(`all`, async $ => {
 	const [config] = await $.need(Config);
-	await $.need(config.weights.map(w => Pass5Group(w)));
+	await $.need(config.weights.map(w => Pass5Group(config.prefix, w)));
 });
 
 async function OtfccBuildAsIs(from, to) {

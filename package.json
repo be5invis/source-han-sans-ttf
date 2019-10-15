@@ -11,11 +11,11 @@
 		"fs-extra": "^3.0.1",
 		"colors": "^1.1.2",
 		"verda": "^1.0.0-10",
-		"which": "^1.2.14"
+		"which": "^1.2.14",
+		"otfcc-ttcize": "^0.9.2"
 	},
 	"scripts": {
 		"install": "node checkenv",
-		"verda": "verda -f verdafile.js",
-		"build": "verda -f verdafile.js ttf"
+		"build": "verda -f verdafile.js"
 	}
 }
