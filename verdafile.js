@@ -19,6 +19,7 @@ const OTF2TTF = `otf2ttf`;
 const OTFCCDUMP = `otfccdump`;
 const OTFCCBUILD = `otfccbuild`;
 const TTFAUTOHINT = `ttfautohint`;
+const SEVEN_ZIP = `7z`;
 
 build.setJournal(`build/.verda-build-journal`);
 build.setSelfTracking();
@@ -192,17 +193,18 @@ const Pass4Otd = file.make(
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Pass 5
 
-const PASS5 = `${OUT}`;
+const OutTtf = `${OUT}/ttf`;
+const OutTtc = `${OUT}/ttc`;
 const Pass5Ttf = file.make(
-	(init, weight) => `${PASS5}/${init}-${weight}.ttf`,
+	(init, weight) => `${OutTtf}/${init}-${weight}.ttf`,
 	async ($, output, init, weight) => {
-		await $.need(de(PASS5));
+		await $.need(de(OutTtf));
 		const [input] = await $.need(Pass4Otd(init, weight));
 		await OtfccBuildAsIs(input.full, output.full);
 	}
 );
 const Pass5Group = file.make(
-	(init, weight) => `${PASS5}/${init}-${weight}.ttc`,
+	(init, weight) => `${OutTtc}/${init}-${weight}.ttc`,
 	async ($, output, init, weight) => {
 		const [config] = await $.need(Config);
 		const [ttfs] = await $.need(GroupFileNamesT(config, weight, Pass5Ttf));
@@ -220,6 +222,39 @@ const All = task(`all`, async $ => {
 	await $.need(config.weights.map(w => Pass5Group(config.prefix, w)));
 });
 
+const TTCArchive = file.make(
+	version => `${OUT}/source-han-sans-ttc-${version}.7z`,
+	async (t, target) => {
+		await t.need(All);
+		await rm(target.full);
+		await cd(`${OUT}/ttc`).run(
+			[SEVEN_ZIP, `a`],
+			[`-t7z`, `-mmt=on`, `-m0=LZMA:a=0:d=1536m:fb=256`],
+			[`../${target.name}.7z`, `*.ttc`]
+		);
+	}
+);
+const TTFArchive = file.make(
+	version => `${OUT}/source-han-sans-ttf-${version}.7z`,
+	async (t, target) => {
+		const [config] = await t.need(Config, de`${OUT}/ttf`);
+		await t.need(All);
+		await rm(target.full);
+		for (const weight of config.weights) {
+			await cd(`${OUT}/ttf`).run(
+				[SEVEN_ZIP, `a`],
+				[`-t7z`, `-mmt=on`, `-m0=LZMA:a=0:d=1536m:fb=256`],
+				[`../${target.name}.7z`, `*-${weight}.ttf`]
+			);
+		}
+	}
+);
+
+const Release = task(`release`, async $ => {
+	const version = await $.need(Version);
+	await $.need(TTFArchive(version), TTCArchive(version));
+});
+
 async function OtfccBuildAsIs(from, to) {
 	await run(OTFCCBUILD, from, [`-o`, to], [`-k`, `-s`, `--keep-average-char-width`, `-q`]);
 }
@@ -228,5 +263,9 @@ async function OtfccBuildAsIs(from, to) {
 // Configuration, directories
 const Config = oracle("config", async () => {
 	return await fs.readJSON(__dirname + "/config.json");
+});
+const Version = oracle("oracles::version", async () => {
+	const pkg = await fs.readJSON(__dirname + "/package.json");
+	return pkg.version;
 });
 const JHint = oracle("hinting-jobs", async () => os.cpus().length);
