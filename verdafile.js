@@ -31,7 +31,7 @@ const PASS1 = `${BUILD}/pass1`;
 const BreakTtc = task.make(
 	weight => `break-ttc::${weight}`,
 	async ($, weight) => {
-		const [config] = await $.need(Config, de(PASS1));
+		const [config] = await $.need(Config, Dependencies, de(PASS1));
 		await run(OTC2OTF, `${SRC}/${config.prefix}-${weight}.ttc`);
 		for (const suffix of config.allRegions) {
 			const partName = `${FontFileName(config, suffix, weight)}.otf`;
@@ -80,7 +80,11 @@ const Pass2Ttc = file.make(
 		const [input] = await $.need(ttfTasks);
 
 		const tempTtc = `${output.dir}/${output.name}.temp.ttc`;
-		await run(OTF2OTC, [`-o`, tempTtc], input.map(x => x.full));
+		await run(
+			OTF2OTC,
+			[`-o`, tempTtc],
+			input.map(x => x.full)
+		);
 		await run(TTFAUTOHINT, tempTtc, output.full);
 		await rm(tempTtc);
 		await run(OTC2OTF, output.full);
@@ -267,5 +271,9 @@ const Config = oracle("config", async () => {
 const Version = oracle("oracles::version", async () => {
 	const pkg = await fs.readJSON(__dirname + "/package.json");
 	return pkg.version;
+});
+const Dependencies = oracle("oracles::dependencies", async () => {
+	const pkg = await fs.readJSON(__dirname + "/package.json");
+	return pkg.dependencies;
 });
 const JHint = oracle("hinting-jobs", async () => os.cpus().length);
