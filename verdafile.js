@@ -274,6 +274,12 @@ const Version = oracle("oracles::version", async () => {
 });
 const Dependencies = oracle("oracles::dependencies", async () => {
 	const pkg = await fs.readJSON(__dirname + "/package.json");
-	return pkg.dependencies;
+	const depJson = {};
+	for (const pkgName in pkg.dependencies) {
+		const depPkg = await fs.readJSON(__dirname + "/node_modules/" + pkgName + "/package.json");
+		const depVer = depPkg.version;
+		depJson[pkgName] = depVer;
+	}
+	return { requirements: pkg.dependencies, actual: depJson };
 });
 const JHint = oracle("hinting-jobs", async () => os.cpus().length);
