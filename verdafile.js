@@ -5,7 +5,7 @@ const fs = require("fs-extra");
 const build = require("verda").create();
 const { task, file, oracle } = build.ruleTypes;
 const { de, fu } = build.rules;
-const { run, rm, cd, mv } = build.actions;
+const { run, rm, cd, mv, cp } = build.actions;
 
 const BUILD = `build`;
 const SRC = `src`;
@@ -29,7 +29,7 @@ module.exports = build;
 // Pass 1
 const PASS1 = `${BUILD}/pass1`;
 const BreakTtc = task.make(
-	weight => `break-ttc::${weight}`,
+	(weight) => `break-ttc::${weight}`,
 	async ($, weight) => {
 		const [config] = await $.need(Config, Dependencies, de(PASS1));
 		await run(OTC2OTF, `${SRC}/${config.prefix}-${weight}.ttc`);
@@ -83,7 +83,7 @@ const Pass2Ttc = file.make(
 		await run(
 			OTF2OTC,
 			[`-o`, tempTtc],
-			input.map(x => x.full)
+			input.map((x) => x.full)
 		);
 		await run(TTFAUTOHINT, tempTtc, output.full);
 		await rm(tempTtc);
@@ -105,18 +105,18 @@ const Chlorophytum = [
 	NODEJS,
 	`--experimental-worker`,
 	`--max-old-space-size=8192`,
-	`./node_modules/@chlorophytum/cli/lib/index.js`
+	`./node_modules/@chlorophytum/cli/lib/index.js`,
 ];
-const Pass3Otd = file.make(
-	(init, weight) => `${PASS3}/${init}-${weight}.otd`,
+const Pass3Ttf = file.make(
+	(init, weight) => `${PASS3}/${init}-${weight}.ttf`,
 	async ($, output, init, weight) => {
 		await $.need(de(PASS3));
 		const [input] = await $.need(Pass2Ttf(init, weight));
-		await run(OTFCCDUMP, input.full, "-o", output.full);
+		await cp(input.full, output.full);
 	}
 );
 const GroupHint = task.make(
-	weight => `group-hint::${weight}`,
+	(weight) => `group-hint::${weight}`,
 	async ($, weight) => {
 		const [config, jHint, hintConfig] = await $.need(
 			Config,
@@ -124,7 +124,7 @@ const GroupHint = task.make(
 			fu(`${HINT_CONFIG}/${weight}.json`),
 			de(PASS3)
 		);
-		const otdTasks = GroupFileNamesT(config, weight, Pass3Otd);
+		const otdTasks = GroupFileNamesT(config, weight, Pass3Ttf);
 		const [inputs] = await $.need(otdTasks);
 		await run(
 			Chlorophytum,
@@ -136,17 +136,17 @@ const GroupHint = task.make(
 		);
 	}
 );
-const HintAll = task(`hint-all`, async $ => {
+const HintAll = task(`hint-all`, async ($) => {
 	const [config] = await $.need(Config);
 	for (const weight of config.weights) {
 		await $.need(GroupHint(weight));
 	}
 });
 const GroupInstr = task.make(
-	weight => `group-instr::${weight}`,
+	(weight) => `group-instr::${weight}`,
 	async ($, weight) => {
 		const [config, hintParam] = await $.need(Config, fu(`${HINT_CONFIG}/${weight}.json`));
-		const otdTasks = GroupFileNamesT(config, weight, Pass3Otd);
+		const otdTasks = GroupFileNamesT(config, weight, Pass3Ttf);
 		const [inputs] = await $.need(otdTasks);
 		await $.need(HintAll);
 		//await $.need(GroupHint`group-hint::${weight}`);
@@ -170,15 +170,15 @@ function* InstrParams(otds) {
 
 function* IntegrateParams(from, to, name) {
 	yield `${from}/${name}.instr.gz`;
-	yield `${from}/${name}.otd`;
-	yield `${to}/${name}.otd`;
+	yield `${from}/${name}.ttf`;
+	yield `${to}/${name}.ttf`;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Pass 4
 const PASS4 = `${BUILD}/pass4`;
-const Pass4Otd = file.make(
-	(init, weight) => `${PASS4}/${init}-${weight}.otd`,
+const Pass4Ttf = file.make(
+	(init, weight) => `${PASS4}/${init}-${weight}.ttf`,
 	async (t, output, init, weight) => {
 		const [hintParam] = await t.need(
 			fu(`${HINT_CONFIG}/${weight}.json`),
@@ -199,35 +199,27 @@ const Pass4Otd = file.make(
 
 const OutTtf = `${OUT}/ttf`;
 const OutTtc = `${OUT}/ttc`;
-const Pass5Ttf = file.make(
-	(init, weight) => `${OutTtf}/${init}-${weight}.ttf`,
-	async ($, output, init, weight) => {
-		await $.need(de(OutTtf));
-		const [input] = await $.need(Pass4Otd(init, weight));
-		await OtfccBuildAsIs(input.full, output.full);
-	}
-);
 const Pass5Group = file.make(
 	(init, weight) => `${OutTtc}/${init}-${weight}.ttc`,
 	async ($, output, init, weight) => {
 		const [config] = await $.need(Config);
-		const [ttfs] = await $.need(GroupFileNamesT(config, weight, Pass5Ttf));
+		const [ttfs] = await $.need(GroupFileNamesT(config, weight, Pass4Ttf));
 		const ttcize = "node_modules/.bin/otfcc-ttcize" + (os.platform() === "win32" ? ".cmd" : "");
 		await run(
 			ttcize,
 			["-x", "--common-width", 1000, "--common-height", 1000],
 			["-o", output.full],
-			[...ttfs.map(t => t.full)]
+			[...ttfs.map((t) => t.full)]
 		);
 	}
 );
-const All = task(`all`, async $ => {
+const All = task(`all`, async ($) => {
 	const [config] = await $.need(Config);
-	await $.need(config.weights.map(w => Pass5Group(config.prefix, w)));
+	await $.need(config.weights.map((w) => Pass5Group(config.prefix, w)));
 });
 
 const TTCArchive = file.make(
-	version => `${OUT}/source-han-sans-ttc-${version}.7z`,
+	(version) => `${OUT}/source-han-sans-ttc-${version}.7z`,
 	async (t, target) => {
 		await t.need(All);
 		await rm(target.full);
@@ -239,7 +231,7 @@ const TTCArchive = file.make(
 	}
 );
 const TTFArchive = file.make(
-	version => `${OUT}/source-han-sans-ttf-${version}.7z`,
+	(version) => `${OUT}/source-han-sans-ttf-${version}.7z`,
 	async (t, target) => {
 		const [config] = await t.need(Config, de`${OUT}/ttf`);
 		await t.need(All);
@@ -254,7 +246,7 @@ const TTFArchive = file.make(
 	}
 );
 
-const Release = task(`release`, async $ => {
+const Release = task(`release`, async ($) => {
 	const version = await $.need(Version);
 	await $.need(TTFArchive(version), TTCArchive(version));
 });
