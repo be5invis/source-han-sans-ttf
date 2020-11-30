@@ -7,7 +7,7 @@ const { task, file, oracle } = build.ruleTypes;
 const { de, fu } = build.rules;
 const { run, rm, cd, mv, cp } = build.actions;
 
-const BUILD = `build`;
+const BUILD = `.build`;
 const SRC = `src`;
 const OUT = `out`;
 const HINT_CONFIG = `hint-config`;
@@ -16,8 +16,6 @@ const NODEJS = `node`;
 const OTF2OTC = `otf2otc`;
 const OTC2OTF = `otc2otf`;
 const OTF2TTF = `otf2ttf`;
-const OTFCCDUMP = `otfccdump`;
-const OTFCCBUILD = `otfccbuild`;
 const TTFAUTOHINT = `ttfautohint`;
 const SEVEN_ZIP = `7z`;
 
@@ -154,68 +152,44 @@ const GroupInstr = task.make(
 	}
 );
 
-function* HintParams(otds) {
-	for (const otd of otds) {
-		yield otd.full;
-		yield `${otd.dir}/${otd.name}.hint.gz`;
+const OutTtf = `${OUT}/ttf`;
+const Pass3TtfOut = file.make(
+	(init, weight) => `${OutTtf}/${init}-${weight}.ttf`,
+	async (t, output, init, weight) => {
+		await t.need(fu(`${HINT_CONFIG}/${weight}.json`), GroupInstr(weight));
 	}
-}
-function* InstrParams(otds) {
-	for (const otd of otds) {
-		yield otd.full;
-		yield `${otd.dir}/${otd.name}.hint.gz`;
-		yield `${otd.dir}/${otd.name}.instr.gz`;
-	}
-}
+);
 
-function* IntegrateParams(from, to, name) {
-	yield `${from}/${name}.instr.gz`;
-	yield `${from}/${name}.ttf`;
-	yield `${to}/${name}.ttf`;
+function* HintParams(fonts) {
+	for (const ttf of fonts) {
+		yield ttf.full;
+		yield `${ttf.dir}/${ttf.name}.hint.gz`;
+	}
+}
+function* InstrParams(fonts) {
+	for (const ttf of fonts) {
+		yield ttf.full;
+		yield `${ttf.dir}/${ttf.name}.hint.gz`;
+		yield `${OutTtf}/${ttf.name}.ttf`;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Pass 4
-const PASS4 = `${BUILD}/pass4`;
-const Pass4Ttf = file.make(
-	(init, weight) => `${PASS4}/${init}-${weight}.ttf`,
-	async (t, output, init, weight) => {
-		const [hintParam] = await t.need(
-			fu(`${HINT_CONFIG}/${weight}.json`),
-			GroupInstr(weight),
-			de(`${PASS4}`)
-		);
-		await run(
-			Chlorophytum,
-			`integrate`,
-			[`-c`, hintParam.full],
-			...IntegrateParams(PASS3, PASS4, output.name)
-		);
-	}
-);
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// Pass 5
-
-const OutTtf = `${OUT}/ttf`;
 const OutTtc = `${OUT}/ttc`;
-const Pass5Group = file.make(
+const TTCIZE = ["node", "node_modules/otb-ttc-bundle/bin/otb-ttc-bundle"];
+const Pass4Group = file.make(
 	(init, weight) => `${OutTtc}/${init}-${weight}.ttc`,
 	async ($, output, init, weight) => {
 		const [config] = await $.need(Config);
-		const [ttfs] = await $.need(GroupFileNamesT(config, weight, Pass4Ttf));
-		const ttcize = "node_modules/.bin/otfcc-ttcize" + (os.platform() === "win32" ? ".cmd" : "");
-		await run(
-			ttcize,
-			["-x", "--common-width", 1000, "--common-height", 1000],
-			["-o", output.full],
-			[...ttfs.map((t) => t.full)]
-		);
+		const [parts] = await $.need(GroupFileNamesT(config, weight, Pass3TtfOut));
+		await run(TTCIZE, "-x", ["-o", output.full], [...parts.map((t) => t.full)]);
 	}
 );
 const All = task(`all`, async ($) => {
 	const [config] = await $.need(Config);
-	await $.need(config.weights.map((w) => Pass5Group(config.prefix, w)));
+	await $.need(config.weights.map((w) => Pass4Group(config.prefix, w)));
 });
 
 const TTCArchive = file.make(
@@ -250,10 +224,6 @@ const Release = task(`release`, async ($) => {
 	const version = await $.need(Version);
 	await $.need(TTFArchive(version), TTCArchive(version));
 });
-
-async function OtfccBuildAsIs(from, to) {
-	await run(OTFCCBUILD, from, [`-o`, to], [`-k`, `-s`, `--keep-average-char-width`, `-q`]);
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Configuration, directories
