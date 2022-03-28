@@ -1,25 +1,20 @@
 {
-	"prefix": "SourceHanSans",
+	"sourcePrefix": "SourceHanSans",
+	"prefix": "ShsTtf",
 	"regions": ["", "K", "SC", "TC", "HC"],
-	"allRegions": [
-		"",
-		"K",
-		"SC",
-		"TC",
-		"HC",
-		"HW",
-		"HWK",
-		"HWSC",
-		"HWTC",
-		"HWHC"
-	],
-	"weights": [
-		"ExtraLight",
-		"Light",
-		"Normal",
-		"Regular",
-		"Medium",
-		"Bold",
-		"Heavy"
-	]
+	"allRegions": ["", "K", "SC", "TC", "HC", "HW", "HWK", "HWSC", "HWTC", "HWHC"],
+	"weights": ["ExtraLight", "Light", "Normal", "Regular", "Medium", "Bold", "Heavy"],
+
+	"naming": {
+		"copyright": "Copyright (c) 2015-2022, Renzhi Li (aka. Belleve Invis, belleve@typeof.net). Portions Copyright (c) 2014, 2015 Adobe Systems Incorporated (http://www.adobe.com/).",
+		"version": "2.004",
+		"familyName": {
+			"en_US": "SHSTTF",
+			"zh_CN": "SHSTTF",
+			"zh_TW": "SHSTTF",
+			"zh_HK": "SHSTTF",
+			"ja_JP": "SHSTTF",
+			"ko_KR": "SHSTTF"
+		}
+	}
 }

@@ -5,7 +5,7 @@ const fs = require("fs-extra");
 const build = require("verda").create();
 const { task, file, oracle } = build.ruleTypes;
 const { de, fu } = build.rules;
-const { run, rm, cd, mv, cp } = build.actions;
+const { run, rm, cd, cp, node } = build.actions;
 
 const BUILD = `.build`;
 const SRC = `src`;
@@ -29,13 +29,21 @@ const PASS1 = `${BUILD}/pass1`;
 const BreakTtc = task.make(
 	(weight) => `break-ttc::${weight}`,
 	async ($, weight) => {
-		const [config] = await $.need(Config, Dependencies, de(PASS1));
-		await run(OTC2OTF, `${SRC}/${config.prefix}-${weight}.ttc`);
+		const [config] = await $.need(Config, Dependencies, de(PASS1), fu`renaming/index.js`);
+		await run(OTC2OTF, `${SRC}/${config.sourcePrefix}-${weight}.ttc`);
 		for (const suffix of config.allRegions) {
+			const sourcePartName = `${SourceFontFileName(config, suffix, weight)}.otf`;
 			const partName = `${FontFileName(config, suffix, weight)}.otf`;
-			if (await fs.pathExists(`${SRC}/${partName}`)) {
+			if (await fs.pathExists(`${SRC}/${sourcePartName}`)) {
 				await rm(`${PASS1}/${partName}`);
-				await mv(`${SRC}/${partName}`, `${PASS1}/${partName}`);
+				await node(`renaming/index.js`, {
+					from: `${SRC}/${sourcePartName}`,
+					to: `${PASS1}/${partName}`,
+					region: suffix,
+					weight,
+					config,
+				});
+				await rm(`${SRC}/${sourcePartName}`);
 			}
 		}
 	}
@@ -54,6 +62,9 @@ const Pass1Ttf = file.make(
 	}
 );
 
+function SourceFontFileName(config, suffix, weight) {
+	return `${config.sourcePrefix}${suffix}-${weight}`;
+}
 function FontFileName(config, suffix, weight) {
 	return `${config.prefix}${suffix}-${weight}`;
 }
@@ -193,7 +204,7 @@ const All = task(`all`, async ($) => {
 });
 
 const TTCArchive = file.make(
-	(version) => `${OUT}/source-han-sans-ttc-${version}.7z`,
+	(version) => `${OUT}/release-ttc-${version}.7z`,
 	async (t, target) => {
 		await t.need(All);
 		await rm(target.full);
@@ -205,7 +216,7 @@ const TTCArchive = file.make(
 	}
 );
 const TTFArchive = file.make(
-	(version) => `${OUT}/source-han-sans-ttf-${version}.7z`,
+	(version) => `${OUT}/release-ttf-${version}.7z`,
 	async (t, target) => {
 		const [config] = await t.need(Config, de`${OUT}/ttf`);
 		await t.need(All);
@@ -220,7 +231,7 @@ const TTFArchive = file.make(
 	}
 );
 
-const Release = task(`release`, async ($) => {
+const _Release = task(`release`, async ($) => {
 	const version = await $.need(Version);
 	await $.need(TTFArchive(version), TTCArchive(version));
 });
