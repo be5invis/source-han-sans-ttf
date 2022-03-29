@@ -193,7 +193,7 @@ const TTCIZE = ["node", "node_modules/otb-ttc-bundle/bin/otb-ttc-bundle"];
 const Pass4Group = file.make(
 	(init, weight) => `${OutTtc}/${init}-${weight}.ttc`,
 	async ($, output, init, weight) => {
-		const [config] = await $.need(Config);
+		const [config] = await $.need(Config, de`${OUT}/ttc`);
 		const [parts] = await $.need(GroupFileNamesT(config, weight, Pass3TtfOut));
 		await run(TTCIZE, "-x", ["-o", output.full], [...parts.map((t) => t.full)]);
 	}
@@ -206,7 +206,7 @@ const All = task(`all`, async ($) => {
 const TTCArchive = file.make(
 	(version) => `${OUT}/release-ttc-${version}.7z`,
 	async (t, target) => {
-		await t.need(All);
+		await t.need(All, de`${OUT}/ttc`);
 		await rm(target.full);
 		await cd(`${OUT}/ttc`).run(
 			[SEVEN_ZIP, `a`],
